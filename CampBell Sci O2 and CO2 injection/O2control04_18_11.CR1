@@ -1,0 +1,111 @@
+'O2 sensors and O2 Mass Flow Controller program created 04/18/2011
+'CR1000 Series Datalogger
+'To create a different opening program template, type in new
+'instructions and select Template | Save as Default Template
+'date:
+'program author:
+
+'Declare Public Variables
+'Example:
+Public PanelT, BattV, O2(4)
+Public I,O2Diff(4),O2Perc(4),O2InjmV(4),O2Prop(4),O2Intgl(4),O2Model(4),SetO2Perc(4),SetPtO2(4),MflowO2mV(4),AbsO2Dif(4),SumO2Dif(4),MflowO2Avg(4),O2Comp(4),count(4)
+Public MFlowDiff(4),GasConst
+
+'Declare Other Variables
+'Example:
+'Dim Counter
+Units BattV=Volts
+Units O2=%
+Alias O2(1)=O2_1
+Alias O2(2)=O2_3
+Alias O2(3)=O2_5
+Alias O2(4)=O2_7
+
+'Declare Constants
+'Example:
+'CONST PI = 3.141592654	
+
+'Define Data Tables
+DataTable (Table1,1,-1)
+	DataInterval (6,15,Sec,10)
+		Average(1,BattV,FP2,False)
+		Average(1,PanelT,FP2,False)
+		Average(1,O2_1,FP2,False)
+		Average(1,O2_3,FP2,False)
+		Average(1,O2_5,FP2,False)
+		Average(1,O2_7,FP2,False)
+EndTable
+
+
+DataTable(Table2,1,-1)
+		DataInterval(0,5,Min,10)
+  	Average (4,MFlowO2mV(),FP2,False)
+EndTable
+
+'Define Subroutines
+'Sub
+	'EnterSub instructions here
+'EndSub
+
+'Main Program
+BeginProg
+	Scan (15,Sec,0,0)
+		PanelTemp (PanelT,250)
+		Battery (BattV)
+		VoltSe(O2(1),1,mv2500C,1,True,0,_60Hz,1,0)
+    VoltSe(O2(2),1,mv2500C,2,True,0,_60Hz,1,0)
+    VoltSe(O2(3),1,mv2500C,3,True,0,_60Hz,1,0)
+    VoltSe(O2(4),1,mv2500C,4,True,0,_60Hz,1,0)
+    VoltDiff (MflowO2mV(1),1,mv5000,5,True ,0,250,1,0)
+    VoltDiff (MflowO2mV(2),1,mv5000,6,True ,0,250,1,0)
+    VoltDiff (MflowO2mV(3),1,mv5000,7,True ,0,250,1,0)
+    VoltDiff (MflowO2mV(4),1,mv5000,8,True ,0,250,1,0)
+    
+    If GasConst = 0 Then
+              For i=1 To 4
+                O2InjmV(i)=500
+                SetO2Perc(i)=32.5
+                SetPtO2(i)=32.5
+              Next I
+              GasConst=8.314
+          EndIf
+'Oxygen Sensor Calibrations
+O2_7 = (O2(4)-234.78)/44.304
+O2_5 = (O2(3)-75.759)/48.101
+O2_3 = (O2(2)-189.55)/43.264
+O2_1 = (O2(1)-106.24)/48.508
+O2Comp(1)=O2_1
+O2Comp(2)=O2_3
+O2Comp(3)=O2_5
+O2Comp(4)=O2_7        
+'      Edited on 10/06/10, uncomment to re-enable O2 MFC
+       For I=1 To 4  
+          O2Diff(I) = SetPtO2(I) - O2Comp(I)
+'          If count (I) <1 Then
+            SetPtO2(I) = SetO2Perc(I)
+            If O2Diff(I)>0 Then
+             O2InjmV(I)=  O2Diff(I)*10000*(SetPtO2(I)/32.5)  'changed multiplier from 1000 to 10000 since unit approached the setpoint, but did not exceed it.
+             If O2InjmV(I)>5000 Then
+             	O2InjmV(I)=5000
+             EndIf
+            EndIf
+'          EndIf
+          MflowO2Avg(I) = Table2.MFlowO2mV_Avg(I,1)
+          MFlowDiff(I) = MFlowO2mV(I) + MflowO2Avg(I)
+          If MFlowDiff(I) <= 130 Then
+            SetPtO2(I) = 0
+'            count(I) = 1
+          EndIf
+          If O2Diff(I)<=0 Then
+          O2InjmV(I)=0
+          EndIf
+       Next I
+   SDMAO4 (O2InjmV(),4,0)
+		'Enter other measurement instructions
+		'Call Output Tables
+		'Example:
+		CallTable Table1
+		CallTable Table2
+	NextScan
+EndProg
+

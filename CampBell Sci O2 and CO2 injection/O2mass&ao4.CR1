@@ -1,0 +1,120 @@
+
+
+'CR1000 Series Datalogger
+'This is the program used to test 9 analyzers going through the multiplexers
+'as long as we connect to computer through CS I/O port and SC32A to pc the values work.
+'If we connect cr1000 to pc through not isolated Rs232 correct program reads incorrect values.
+'CS I/O serial connect direct to pc will not connect
+' 
+' This program builds on Jan2010workingCO2MX+Ao4tst+CO2contl2.CR1 where 9 siemens were read and two AO4
+' modules that fed the setpoint value to the Aalborg mass flow controller.  For testing purposes
+' only 1 Aalborg was used.  This program calculates the values and uses an array per variable to control 8 Aalborg.
+'
+'After going back to orig 2003 SPAR Chamber programming with John Truitts help noted that 
+'   outflag=0
+'   TmtSwitch=0
+'   CO2Switch=0
+'   TmtCO2=350
+'   CO2InjCal=0
+'never change from their initiallized values in Sub 3 therefore commented out
+'date:02/04/2010
+
+'program author:Maritza Romero
+
+'Declare Public Variables
+'Example:
+
+Public PTemp, batt_volt,GasConst,P18Time(9),I, O2Diff(1)
+Public O2Perc(1),O2InjmV(1),O2Prop(1),O2Intgl(1),O2Model(1)  'Changed CO2ppm(9) to (10) for UltraMat 23
+Public SetO2Perc(1),SetPtO2(1),MflowO2mV(1)
+Public AbsO2Dif(1),SumO2Dif(1), 
+Public TimeMin,Time60Min,Time60Sec,Time15Min,TimeHour,DayTime
+'Declare Other Variables
+'Declare Constants
+'eg:CONST PI = 3.141592654	
+'Define Data Tables
+'this program does actually output anything only used for on screen testing there needs to be
+' a Average statement with the Volt diff in order to output.
+DataTable (Test,1,-1)
+	DataInterval (0,15,min,10)
+	Minimum (1,batt_volt,FP2,0,False)
+	Sample (1,PTemp,FP2)
+	Average(1,O2Perc(),FP2,False)
+	Average (1,O2InjmV(),FP2,False)
+	Average (1,SetPtO2(),FP2,False)
+	Average (1,SetO2Perc(),FP2,False)
+	Average (1,MFlowO2mV(),FP2,False)
+	
+EndTable
+'Because we have set up the experiment differently fromthe old SPAR system Subroutines will not be used 
+'but if they were they would go here.
+
+'Main Program
+BeginProg
+
+	Scan (2,Sec,0,0)
+		PanelTemp (PTemp,250)
+		Battery (Batt_volt)
+
+VoltSe(O2Perc(1),1,mV5000,3,True ,0,250,0.02,0)
+VoltDiff (MFlowO2mV(1),1,mV5000,1,True ,0,250,.02,0)
+
+  SetO2Perc(1)=31
+  SetPtO2(1)=SetO2Perc(1)
+'-------------------------------------old Subroutine 4-------------------------------------------
+'-------------------------CO2 control using ParCntl and MFlow to get CO2InjmV---------------
+                                        
+   
+'          AbsO2Dif(I) = ABS(O2Diff(I))
+'            If (AbsO2Dif(I) < 2) Then                                  
+'              SumO2Dif(I) = O2Diff(I) + SumO2Dif(I)
+'            EndIf
+'            If (SumO2Dif(I) < -5) Then                                  
+'              SumO2Dif(I) = -5
+'            EndIf
+'            If (SumO2Dif(I) >= 5000) Then                                  
+'              SumO2Dif(I) = 5000
+'            EndIf
+'          O2Prop(I) = O2Diff(I) * 75
+'            If (AbsO2Dif(I) < 50) Then                                  
+'              SumO2Dif(I) = O2Diff(I) + SumO2Dif(I)
+'              O2Intgl(I) = SumO2Dif(I) * 0.5
+'            Else 
+'              O2Intgl(I) = 0
+'            EndIf
+'  'For prelim test will not put the parcntl part of the model since not connected.     
+'  '       CO2Model(I) = PARcntl * 0.15
+'          O2InjmV(I) = O2Prop(I) '+ CO2Model(I)
+'          'CO2InjmV(I) = CO2InjmV(I) + CO2Intgl(I)  'Commented out to see if this would reduce overshoot on CO2 injection
+'            If (O2InjmV(I) < 0) Then                                  
+'              O2InjmV(I) = 0
+'            EndIf
+'            If (O2InjmV(I) >= 5000) Then                                  
+'            O2InjmV(I) = 5000
+'            EndIf
+'       ' Else 
+'          SumO2Dif(I) = 0
+'          O2InjmV(I) = 0
+'       ' EndIF  
+'        'Next I  
+      I=1
+          O2Diff(I) = SetPtO2(I) - O2Perc(1)
+          If O2Diff(I)>0 Then
+             O2InjmV(I)=  O2Diff(I)*1000
+             If O2InjmV(I)>5000 Then
+             	O2InjmV(I)=5000
+            Endif
+          EndIf
+          If O2Diff(I)<=0 Then
+                O2InjmV(I)=0
+          EndIf
+          SDMAO4 (O2InjmV(),1,0)
+
+		
+		'Enter other measurement instructions
+		'Call Output Tables
+
+		CallTable Test
+	NextScan
+EndProg
+

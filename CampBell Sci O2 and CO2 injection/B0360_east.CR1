@@ -1,0 +1,367 @@
+'CR1000 Series Datalogger Program for Measuring Apogee Model SI-111 and SI-121 (Infrared Radiometers)
+'date: January 3, 2008
+'program author: Mark Blonquist
+
+'Wiring instructions for Apogee model SI-111 and SI-121 (Infrared Radiometers)
+'Red Wire (positive lead for thermopile) = high side of differential channel (2H in program below)
+'Black Wire (negative lead for thermopile) = low side of differential channel (2L in program below)
+'Clear Wire (shield wire) - ground
+'Green Wire (positive lead for thermistor) = single-ended channel (SE1 in program below)
+'Blue Wire (negative lead for thermistor) = ground
+'White Wire (excitation for thermistor) = excitation channel (EX1 in program below)
+
+'Explanation of variables and constants used in program
+'PanelT = datalogger panel temperature
+'BattV = datalogger battery voltage
+'SBTempC = sensor body temperature in degrees Celsius
+'SBTempK = sensor body temperature in Kelvin
+'TargmV = mV output of thermopile infrared detector (dependent on temperature difference between target and sensor body)
+'m = slope of equation relating target and sensor body temperatures to mV output of thermopile
+'b = intercept of the equation relating target and sensor body temperatures to mV output of thermopile
+'TargTempK = target temperature in Kelvin
+'TargTempC = target temperature in degrees Celsius
+'mC2 = polynomial coefficient (C2) used to calculate slope (m)
+'mC1 = polynomial coefficient (C1) used to calculate slope (m)
+'mC0 = polynomial coefficient (C0) used to calculate slope (m)
+'bC2 = polynomial coefficient (C2) used to calculate intercept (b)
+'bC1 = polynomial coefficient (C1) used to calculate intercept (b)
+'bC0 = polynomial coefficient (C0) used to calculate intercept (b)
+'Note that all calibration coefficients are sensor-specific; those listed below are examples and must be changed based on the sensor being used.
+
+'Declare public variables
+
+Public PanelT,BattV,SBTempC(4),SBTempK(4),TargmV(4),m_2,b_2,m_4,b_4,m_6,b_6,m_8,b_8,TargTempK(4),TargTempC(4),PAR(4),SEVolt(16),VaisTempC(4)
+'Public I,O2Diff(1),O2(4),O2Perc(1),O2InjmV(1),O2Prop(1),O2Intgl(1),O2Model(1),SetO2Perc(1),SetPtO2(1),MflowO2mV(1),AbsO2Dif(1),SumO2Dif(1)
+Public TimeMin,Time60Min,Time60Sec,Time15Min,TimeHour,DayTime,RH(4),TdC_2,TdC_4,TdC_6,TdC_8,TC1,TC2,TC3,TC4
+Units BattV=Volts
+Units PAR=mV
+'Units O2=%
+Units VaisTempC=C
+
+'Declare constants (replace the listed values with coefficients received with sensor)
+'Constants for IR sensor 2
+Const mC2_2 = 77517.3
+Const mC1_2 = 10301400
+Const mC0_2 = 1544270000
+Const bC2_2 = 33083.9
+Const bC1_2 = -1466060
+Const bC0_2 = 5074500
+'Constants for IR sensor 4
+Const mC2_4 = 54941.9
+Const mC1_4 = 11753800
+Const mC0_4 = 1548410000
+Const bC2_4 = 7872.66
+Const bC1_4 = -2004750
+Const bC0_4 = -13915400
+'Constants for IR sensor 6
+Const mC2_6 = 81351.9
+Const mC1_6 = 9214440
+Const mC0_6 = 1440570000
+Const bC2_6 = 24466.9
+Const bC1_6 = -1050600
+Const bC0_6 = 10331300
+'Constants for IR sensor 8
+Const mC2_8 = 87173.2
+Const mC1_8 = 10123200
+Const mC0_8 = 1530170000
+Const bC2_8 = 46883.7
+Const bC1_8 = -1567030
+Const bC0_8 = -219017
+'Variables and units for Vaisala RH/Temp sensor
+Dim AirTC_2
+Dim AirTC_4
+Dim AirTC_6
+Dim AirTC_8
+Dim LCount_4
+Alias TC1=TC_2
+Alias TC2=TC_4
+Alias TC3=TC_6
+Alias TC4=TC_8
+Alias PAR(1)=PAR_2
+Alias PAR(2)=PAR_4
+Alias PAR(3)=PAR_6
+Alias PAR(4)=PAR_8
+'Alias O2(1)=O2_2
+'Alias O2(2)=O2_4
+'Alias O2(3)=O2_6
+'Alias O2(4)=O2_8
+Alias VaisTempC(1)=VaisTempC_2
+Alias VaisTempC(2)=VaisTempC_4
+Alias VaisTempC(3)=VaisTempC_6
+Alias VaisTempC(4)=VaisTempC_8
+Alias RH(1)=RH_2
+Alias RH(2)=RH_4
+Alias RH(3)=RH_6
+Alias RH(4)=RH_8
+Alias TargTempC(1)=TargTempC_2
+Alias TargTempC(2)=TargTempC_4
+Alias TargTempC(3)=TargTempC_6
+Alias TargTempC(4)=TargTempC_8
+'Alias TdC=TdC_2
+
+'Define data table (table is outputting data every 60 seconds)
+DataTable(Table1,1,-1)
+		DataInterval(6,15,Min,10)' changed from min to sec to test oxygen sensor
+		Average(1,BattV,FP2,False)
+		Average(1,PanelT,FP2,False)
+'		Average(1,O2_2,FP2,False)
+'		Average(1,O2_4,FP2,False)
+'		Average(1,O2_6,FP2,False)
+'		Average(1,O2_8,FP2,False)
+		Average(1,VaisTempC_2,FP2,False)
+		Average(1,VaisTempC_4,FP2,False)
+		Average(1,VaisTempC_6,FP2,False)
+		Average(1,VaisTempC_8,FP2,False)
+		Average(1,RH_2,FP2,False)
+		Average(1,RH_4,FP2,False)
+		Average(1,RH_6,FP2,False)
+		Average(1,RH_8,FP2,False)
+		Average(1,TdC_2,FP2,False)
+		Average(1,TdC_4,FP2,False)
+		Average(1,TdC_6,FP2,False)
+		Average(1,TdC_8,FP2,False)
+'		Average(1,TargmV(),FP2,False)
+		'Average(1,SBTempC(1),FP2,False)
+		'Average(1,SBTempC(2),FP2,False)
+		'Average(1,SBTempC(3),FP2,False)
+		'Average(1,SBTempC(4),FP2,False)
+		Average(1,TargTempC_2,FP2,False)
+		Average(1,TargTempC_4,FP2,False)
+		Average(1,TargTempC_6,FP2,False)
+		Average(1,TargTempC_8,FP2,False)
+		Average(1,PAR_2,FP2,False)
+		Average(1,PAR_4,FP2,False)
+		Average(1,PAR_6,FP2,False)
+		Average(1,PAR_8,FP2,False)
+		Average(1,TC_2,FP2,False)
+  	Average(1,TC_4,FP2,False)
+  	Average(1,TC_6,FP2,False)
+  	Average(1,TC_8,FP2,False)
+'		Average(1,O2Perc(),FP2,False)
+'	Average (1,O2InjmV(),FP2,False)
+'	Average (1,SetPtO2(),FP2,False)
+'	Average (1,SetO2Perc(),FP2,False)
+'	Average (1,MFlowO2mV(),FP2,False)
+'	Average(1,TC_2,FP2,False)
+'	Average(1,TC_6,FP2,False)
+ 		Sample(1,BattV,FP2)
+		Sample(1,PanelT,FP2)
+'		Sample(1,O2_2,FP2)
+'		Sample(1,O2_4,FP2)
+'		Sample(1,O2_6,FP2)
+'		Sample(1,O2_8,FP2)
+		Sample(1,VaisTempC_2,FP2)
+		Sample(1,VaisTempC_4,FP2)
+		Sample(1,VaisTempC_6,FP2)
+		Sample(1,VaisTempC_8,FP2)
+		Sample(1,RH_2,FP2)
+		Sample(1,RH_4,FP2)
+		Sample(1,RH_6,FP2)
+		Sample(1,RH_8,FP2)
+		Sample(1,TdC_2,FP2)
+		Sample(1,TdC_4,FP2)
+		Sample(1,TdC_6,FP2)
+		Sample(1,TdC_8,FP2)
+'		Sample(1,TargmV(),FP2)
+		'Sample(1,SBTempC(1),FP2)
+		'Sample(1,SBTempC(2),FP2)
+		'Sample(1,SBTempC(3),FP2)
+		'Sample(1,SBTempC(4),FP2)
+		Sample(1,TargTempC_2,FP2)
+		Sample(1,TargTempC_4,FP2)
+		Sample(1,TargTempC_6,FP2)
+		Sample(1,TargTempC_8,FP2)
+		Sample(1,PAR_2,FP2)
+		Sample(1,PAR_4,FP2)
+		Sample(1,PAR_6,FP2)
+		Sample(1,PAR_8,FP2)
+'		Sample(1,O2Perc(),FP2)
+'	Sample (1,O2InjmV(),FP2)
+'	Sample (1,SetPtO2(),FP2)
+'	Sample (1,SetO2Perc(),FP2)
+'	Sample (1,MFlowO2mV(),FP2)
+	Sample(1,TC_2,FP2)
+	Sample(1,TC_4,FP2)
+	Sample(1,TC_6,FP2)
+	Sample(1,TC_8,FP2)
+EndTable
+
+DataTable(Table2,1,-1)
+		DataInterval(0,1,Min,10)' changed from min to sec to test oxygen sensor
+		Sample(1,BattV,FP2)
+		Sample(1,PanelT,FP2)
+'		Sample(1,O2_2,FP2)
+'		Sample(1,O2_4,FP2)
+'		Sample(1,O2_6,FP2)
+'		Sample(1,O2_8,FP2)
+		Sample(1,VaisTempC_2,FP2)
+		Sample(1,VaisTempC_4,FP2)
+		Sample(1,VaisTempC_6,FP2)
+		Sample(1,VaisTempC_8,FP2)
+		Sample(1,RH_2,FP2)
+		Sample(1,RH_4,FP2)
+		Sample(1,RH_6,FP2)
+		Sample(1,RH_8,FP2)
+		Sample(1,TdC_2,FP2)
+		Sample(1,TdC_4,FP2)
+		Sample(1,TdC_6,FP2)
+		Sample(1,TdC_8,FP2)
+'		Sample(1,TargmV(),FP2)
+		'Sample(1,SBTempC(1),FP2)
+		'Sample(1,SBTempC(2),FP2)
+		'Sample(1,SBTempC(3),FP2)
+		'Sample(1,SBTempC(4),FP2)
+		Sample(1,TargTempC_2,FP2)
+		Sample(1,TargTempC_4,FP2)
+		Sample(1,TargTempC_6,FP2)
+		Sample(1,TargTempC_8,FP2)
+		Sample(1,PAR_2,FP2)
+		Sample(1,PAR_4,FP2)
+		Sample(1,PAR_6,FP2)
+		Sample(1,PAR_8,FP2)
+'		Sample(1,O2Perc(),FP2)
+'	Sample (1,O2InjmV(),FP2)
+'	Sample (1,SetPtO2(),FP2)
+'	Sample (1,SetO2Perc(),FP2)
+'	Sample (1,MFlowO2mV(),FP2)
+	Sample(1,TC_2,FP2)
+	Sample(1,TC_4,FP2)
+	Sample(1,TC_6,FP2)
+	Sample(1,TC_8,FP2)
+EndTable
+
+'Main program (program is making a measurement every 5 seconds)
+BeginProg
+			Scan(15,Sec,0,0)
+					PanelTemp(PanelT,_60Hz)
+					Battery(BattV)
+					PortSet(5,1)
+			'O2 Sensors					
+					PulsePort(6,10000)
+'					VoltSe(O2(1),1,mV2500,1,True,0,_60Hz,0.02,0.0)
+'					VoltSe(O2(2),1,mV2500,2,True,0,_60Hz,0.02,0.0)
+'					VoltSe(O2(3),1,mV2500,3,True,0,_60Hz,0.02,0.0)
+'					VoltSe(O2(4),1,mV2500,4,True,0,_60Hz,0.02,0.0)
+			'Vaisala Temperature Sensors
+					PulsePort(6,10000)
+					VoltSe(VaisTempC(1),1,mV2500,1,True,0,_60Hz,0.1,-20)
+					VoltSe(VaisTempC(2),1,mV2500,2,True,0,_60Hz,0.1,-20)
+					VoltSe(VaisTempC(3),1,mV2500,3,True,0,_60Hz,0.1,-20)
+					VoltSe(VaisTempC(4),1,mV2500,4,True,0,_60Hz,0.1,-20)
+			'Vaisala RH Sensors
+					PulsePort(6,10000)
+					VoltSe(RH(1),1,mV2500,1,True,0,_60Hz,0.1,0.0)
+					VoltSe(RH(2),1,mV2500,2,True,0,_60Hz,0.1,0.0)
+					VoltSe(RH(3),1,mV2500,3,True,0,_60Hz,0.1,0.0)
+					VoltSe(RH(4),1,mV2500,4,True,0,_60Hz,0.1,0.0)
+			'Infrared thermistor Single-ended reading for Apogee Infrared T/c
+					PulsePort(6,10000)
+					Therm109(SBTempC(1),1,1,Vx3,0,_60Hz,1.0,0)
+					Therm109(SBTempC(2),1,2,Vx3,0,_60Hz,1.0,0)
+					Therm109(SBTempC(3),1,3,Vx2,0,_60Hz,1.0,0)
+					Therm109(SBTempC(4),1,4,Vx2,0,_60Hz,1.0,0)
+			'Thermopile differential reading for Apogee Infrared T/c		
+					PulsePort(6,10000)			
+					VoltDiff(TargmV(1),1,mV2_5,1,True,0,_60Hz,1.0,0)
+					VoltDiff(TargmV(2),1,mV2_5,2,True,0,_60Hz,1.0,0)
+					PulsePort(6,10000)
+					VoltDiff(TargmV(3),1,mV2_5,1,True,0,_60Hz,1.0,0)
+					VoltDiff(TargmV(4),1,mV2_5,2,True,0,_60Hz,1.0,0)		
+			'PAR reading from Apogee Pyranometer SP-110, Differential Voltage measurements PAR:
+					PulsePort(6,10000)
+					VoltDiff(PAR(1),1,mV250,1,True,0,_60Hz,5.00,0.0)
+					VoltDiff(PAR(2),1,mV250,2,True,0,_60Hz,5.00,0.0)
+					PulsePort(6,10000)
+					VoltDiff(PAR(3),1,mV250,1,True,0,_60Hz,5.00,0.0)
+					VoltDiff(PAR(4),1,mV250,2,True,0,_60Hz,5.00,0.0)
+			'Thermocouple readings from rooms 2,4,6,and 8
+					PulsePort(6,10000)
+          TCDiff (TC1,1,mV2_5C,1,TypeT,PanelT,True ,0,250,1.0,0)
+          TCDiff (TC2,1,mV2_5C,2,TypeT,PanelT,True ,0,250,1.0,0)
+          PulsePort(6,10000)
+          TCDiff (TC3,1,mV2_5C,1,TypeT,PanelT,True ,0,250,1.0,0)
+          TCDiff (TC4,1,mV2_5C,2,TypeT,PanelT,True ,0,250,1.0,0)
+		PortSet(5,0)
+
+'					VoltSe(O2Perc(1),1,mV5000,3,True ,0,250,0.02,0)
+'					VoltDiff (MFlowO2mV(1),1,mV5000,3,True ,0,250,1,0)
+'      I=1
+'          O2Diff(I) = SetPtO2(I) - O2(3)
+'          If O2Diff(I)>0 Then
+'             O2InjmV(I)=  O2Diff(I)*10000  'changed multiplier from 1000 to 5000 since unit approached the setpoint, but did not exceed it.
+'             If O2InjmV(I)>5000 Then
+'             	O2InjmV(I)=5000
+'            EndIf
+'          EndIf
+'          If O2Diff(I)<=0 Then
+'                O2InjmV(I)=0
+'          EndIf
+'          If MflowO2mV <=10.86 Then
+'            SetO2Perc = 0
+'          EndIf
+'          SDMAO4 (O2InjmV(),1,0)
+''
+''  SetO2Perc(1)=32.15  'used 32.15 instead of 32 because it would level out around 0.10-0.20 points below setpoint
+'  SetPtO2(1)=SetO2Perc(1)
+		
+			'IR sensor 1
+					'Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+					m_2 = mC2_2*SBTempC(1)^2+mC1_2*SBTempC(1)+mC0_2
+					b_2 = bC2_2*SBTempC(1)^2+bC1_2*SBTempC(1)+bC0_2
+			
+			'Calculation of target temperature
+					SBTempK(1) = SBTempC(1)+273.15
+					TargTempK(1) = ((SBTempK(1)^4)+m_2*TargmV(1)+b_2)^0.25
+					TargTempC(1) = TargTempK(1)-273.15
+
+			'IR sensor 3
+					'Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+					m_4 = mC2_4*SBTempC(2)^2+mC1_4*SBTempC(2)+mC0_4
+					b_4 = bC2_4*SBTempC(2)^2+bC1_4*SBTempC(2)+bC0_4
+			
+			'Calculation of target temperature
+					SBTempK(2) = SBTempC(2)+273.15
+					TargTempK(2) = ((SBTempK(2)^4)+m_4*TargmV(2)+b_4)^0.25
+					TargTempC(2) = TargTempK(2)-273.15
+
+			'IR sensor 5
+					'Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+					m_6 = mC2_6*SBTempC(3)^2+mC1_6*SBTempC(3)+mC0_6
+					b_6 = bC2_6*SBTempC(3)^2+bC1_6*SBTempC(3)+bC0_6
+			
+			'Calculation of target temperature
+					SBTempK(3) = SBTempC(3)+273.15
+					TargTempK(3) = ((SBTempK(3)^4)+m_6*TargmV(3)+b_6)^0.25
+					TargTempC(3) = TargTempK(3)-273.15
+
+			'IR sensor 7
+					'Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+					m_8 = mC2_8*SBTempC(4)^2+mC1_8*SBTempC(4)+mC0_8
+					b_8 = bC2_8*SBTempC(4)^2+bC1_8*SBTempC(4)+bC0_8
+			
+			'Calculation of target temperature
+					SBTempK(4) = SBTempC(4)+273.15
+					TargTempK(4) = ((SBTempK(4)^4)+m_8*TargmV(4)+b_8)^0.25
+					TargTempC(4) = TargTempK(4)-273.15
+		
+		'Dew Point calculation TdC:
+		AirTC_2=VaisTempC(1)
+		DewPoint(TdC_2,AirTC_2,RH(1))
+		If TdC_2>AirTC_2 OR TdC_2=NAN Then TdC_2=AirTC_2
+		'Dew Point calculation TdC_4:
+		AirTC_4=VaisTempC(2)
+		DewPoint(TdC_4,AirTC_4,RH(2))
+		If TdC_4>AirTC_4 OR TdC_4=NAN Then TdC_4=AirTC_4
+		'Dew Point calculation TdC_6:
+		AirTC_6=VaisTempC(3)
+		DewPoint(TdC_6,AirTC_6,RH(3))
+		If TdC_6>AirTC_6 OR TdC_6=NAN Then TdC_6=AirTC_6
+		'Dew Point calculation TdC_8:
+		AirTC_8=VaisTempC(4)
+		DewPoint(TdC_8,AirTC_8,RH(4))
+		If TdC_8>AirTC_8 OR TdC_8=NAN Then TdC_8=AirTC_8
+			'Call output tables
+					CallTable(Table1)
+					CallTable(Table2)
+		NextScan
+EndProg
